@@ -1,0 +1,33 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Tanstack docs Discord bot configuration",
+    "type": "object",
+    "properties": {
+        "logLevel": {
+            "description": "Pino log level threshold. Lower-priority logs are ignored.",
+            "type": "string",
+            "enum": [
+                "fatal",
+                "error",
+                "warn",
+                "info",
+                "debug",
+                "trace",
+                "silent"
+            ]
+        },
+        "clientId": {
+            "description": "The Discord Application Client ID",
+            "type": "string"
+        },
+        "guildId": {
+            "description": "The TanStack Discord Guild ID",
+            "type": "string"
+        }
+    },
+    "required": [
+        "logLevel",
+        "clientId",
+        "guildId"
+    ]
+}
