@@ -17,6 +17,11 @@ const envSchema = z
         1,
         'Token is required - Your discord token from the discord developer portal',
       ),
+
+    ALGOLIA_APPLICATION_ID: z
+      .string()
+      .min(1, 'Algolia Application ID is required'),
+    ALGOLIA_API_KEY: z.string().min(1, 'Algolia API Key is required'),
   })
   .transform((env) => ({
     /**
@@ -29,6 +34,10 @@ const envSchema = z
      * Your discord token from the discord developer portal
      */
     discordToken: env.DISCORD_TOKEN,
+    algoliaConfig: {
+      applicationId: env.ALGOLIA_APPLICATION_ID,
+      apiKey: env.ALGOLIA_API_KEY,
+    },
   }))
 
 const configSchema = z.object({

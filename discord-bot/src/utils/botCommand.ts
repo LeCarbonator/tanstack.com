@@ -1,19 +1,32 @@
-import { ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js'
+import {
+  AutocompleteInteraction,
+  ChatInputCommandInteraction,
+  SlashCommandBuilder,
+  SlashCommandOptionsOnlyBuilder,
+  SlashCommandSubcommandsOnlyBuilder,
+} from 'discord.js'
 import fs from 'node:fs'
 import path from 'node:path'
 import z from 'zod'
 import { logger } from '../logging.js'
 import { commandsFolderPath } from './paths.js'
 
+type AnySlashCommandBuilder =
+  | SlashCommandBuilder
+  | SlashCommandOptionsOnlyBuilder
+  | SlashCommandSubcommandsOnlyBuilder
+
 export interface BotCommand {
-  data: SlashCommandBuilder
+  data: AnySlashCommandBuilder
   execute: (interaction: ChatInputCommandInteraction) => any
+  autocomplete?: (interaction: AutocompleteInteraction) => any
 }
 
 export const botCommandSchema = z
-  .object({
+  .strictObject({
     data: z.instanceof(SlashCommandBuilder),
     execute: z.function(),
+    autocomplete: z.function().optional(),
   })
   .transform((obj) => obj as BotCommand)
 
@@ -29,6 +42,8 @@ export async function getCommands(): Promise<BotCommand[]> {
     .readdirSync(foldersPath)
     .filter((file) => file.endsWith('.js'))
 
+  let hasFailed = false
+
   for (const file of commandFiles) {
     const filePath = path.join(foldersPath, file)
     const { default: command } = await import(`file://${filePath}`)
@@ -38,10 +53,16 @@ export async function getCommands(): Promise<BotCommand[]> {
     if (result.success) {
       commands.push(result.data)
     } else {
-      logger.warn(
+      logger.error(
         `Failed to load command at ${filePath} due to validation errors:\n${z.prettifyError(result.error)}`,
       )
+      hasFailed = true
     }
   }
+
+  if (hasFailed) {
+    process.exit(1)
+  }
+
   return commands
 }
