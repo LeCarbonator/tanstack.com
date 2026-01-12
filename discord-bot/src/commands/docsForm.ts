@@ -1,10 +1,38 @@
-import { SlashCommandBuilder } from 'discord.js'
+import {
+  EmbedBuilder,
+  MessageFlags,
+  SectionBuilder,
+  SlashCommandBuilder,
+} from 'discord.js'
 import { createCommand } from '../utils/botCommand.js'
-import { algoliaSearch } from '../infrastructure/search/algoliaSearch.js'
+import { type AlgoliaSearchResult } from '../infrastructure/search/algoliaSearch.js'
+import {
+  frameworkOptions,
+  getFrameworkCommandChoices,
+} from '../infrastructure/frameworks.js'
+import { getProjectPath } from '../utils/paths.js'
+import { readFileSync } from 'node:fs'
+import { createDocsContainer } from '../utils/container.js'
 
 const data = new SlashCommandBuilder()
   .setName('docs-form')
   .setDescription('Display Tanstack Form documentation')
+  .addStringOption((option) =>
+    option
+      .setName('framework')
+      .setDescription('The framework to search docs for')
+      .setRequired(true)
+      .addChoices(
+        getFrameworkCommandChoices([
+          'react',
+          'vue',
+          'angular',
+          'solid',
+          'lit',
+          'svelte',
+        ]),
+      ),
+  )
   .addStringOption((option) =>
     option
       .setName('query')
@@ -16,19 +44,31 @@ const data = new SlashCommandBuilder()
 export default createCommand({
   data,
   execute: async (interaction) => {
-    await interaction.reply(
-      `Documentation is available at https://tanstack.com/ \nYou requested: ${interaction.options.getString('query', true)}`,
-    )
+    const mockPath = getProjectPath('../mockAlgolia.json')
+    const result = JSON.parse(
+      readFileSync(mockPath, 'utf-8'),
+    ) as AlgoliaSearchResult
 
-    const res = await algoliaSearch({
-      query: interaction.options.getString('query', true),
-      // category: 'form',
-    })
-    console.log(JSON.stringify(res, null, 2))
+    const firstResult = result.results[0]
+    if ('hits' in firstResult) {
+      await interaction.reply({
+        components: [createDocsContainer(firstResult.hits[0])],
+        flags: MessageFlags.IsComponentsV2,
+      })
+    }
+
+    // const res = await algoliaSearch({
+    //   query: interaction.options.getString('query', true),
+
+    //   // category: 'form',
+    // })
   },
   autocomplete: async (interaction) => {
     await interaction.respond([
-      { name: 'API Call to Algolia here', value: 'Form Composition' },
+      {
+        name: 'API Call to Algolia here',
+        value: interaction.options.getFocused(),
+      },
     ])
   },
 })

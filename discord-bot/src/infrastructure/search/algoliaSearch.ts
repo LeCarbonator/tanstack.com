@@ -1,4 +1,4 @@
-import { liteClient } from 'algoliasearch/lite'
+import { liteClient, type SearchResponses } from 'algoliasearch/lite'
 import { env } from '../../config.js'
 
 const algoliaClient = liteClient(
@@ -18,23 +18,25 @@ const ALGOLIA_SEARCH_PARAMS = {
     'content',
     'library',
   ],
-  attributesToSnippet: ['content:20'],
+  attributesToSnippet: ['content:50'],
   filters: 'version:latest',
 } as const
 
-// Algolia hit types - our docs-specific shape
-interface AlgoliaHierarchy {
-  lvl0?: string
-  lvl1?: string
-  lvl2?: string
-  lvl3?: string
-  lvl4?: string
-  lvl5?: string
-  lvl6?: string
-  [key: string]: string | undefined
-}
+export type AlgoliaHierarchyKeys =
+  | 'lvl0'
+  | 'lvl1'
+  | 'lvl2'
+  | 'lvl3'
+  | 'lvl4'
+  | 'lvl5'
+  | 'lvl6'
 
-interface AlgoliaHit extends Record<string, unknown> {
+// Algolia hit types - our docs-specific shape
+export type AlgoliaHierarchy = {
+  [K in AlgoliaHierarchyKeys]: string | null
+} & Record<string, string | undefined | null>
+
+export interface AlgoliaHit extends Record<string, unknown> {
   objectID: string
   url: string
   library?: string
@@ -46,6 +48,8 @@ interface AlgoliaHit extends Record<string, unknown> {
   _highlightResult?: Record<string, unknown>
   _snippetResult?: Record<string, unknown>
 }
+
+export type AlgoliaSearchResult = SearchResponses<AlgoliaHit>
 
 interface LiteSearchOptions {
   query: string
@@ -67,7 +71,9 @@ function buildFilters(opts: LiteSearchOptions) {
   }
 }
 
-export async function algoliaSearch(opts: LiteSearchOptions) {
+export async function algoliaSearch(
+  opts: LiteSearchOptions,
+): Promise<AlgoliaSearchResult> {
   const limit = Math.max(opts.limit ?? 10, 25) // 25 is the max allowed by Discord API.
 
   return await algoliaClient.search({

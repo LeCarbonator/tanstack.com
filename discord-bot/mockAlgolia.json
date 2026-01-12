@@ -1,0 +1,129 @@
+{
+    "results": [
+        {
+            "hits": [
+                {
+                    "version": "latest",
+                    "tags": [],
+                    "url": "https://tanstack.com/form/latest/docs/framework/react/guides/form-composition",
+                    "url_without_variables": "https://tanstack.com/form/latest/docs/framework/react/guides/form-composition",
+                    "url_without_anchor": "https://tanstack.com/form/latest/docs/framework/react/guides/form-composition",
+                    "anchor": "",
+                    "content": null,
+                    "content_camel": null,
+                    "lang": "en",
+                    "language": "en",
+                    "type": "lvl1",
+                    "no_variables": false,
+                    "weight": {
+                        "pageRank": 190,
+                        "level": 90,
+                        "position": 0
+                    },
+                    "hierarchy": {
+                        "lvl0": "react",
+                        "lvl1": "Form Composition",
+                        "lvl2": null,
+                        "lvl3": null,
+                        "lvl4": null,
+                        "lvl5": null,
+                        "lvl6": null
+                    },
+                    "recordVersion": "v3",
+                    "library": "form",
+                    "framework": "react",
+                    "objectID": "0-https://tanstack.com/form/latest/docs/framework/react/guides/form-composition"
+                },
+                {
+                    "version": "latest",
+                    "tags": [],
+                    "url": "https://tanstack.com/form/latest/docs/framework/react/guides/form-composition#custom-form-hooks",
+                    "url_without_variables": "https://tanstack.com/form/latest/docs/framework/react/guides/form-composition#custom-form-hooks",
+                    "url_without_anchor": "https://tanstack.com/form/latest/docs/framework/react/guides/form-composition",
+                    "anchor": "custom-form-hooks",
+                    "content": null,
+                    "content_camel": null,
+                    "lang": "en",
+                    "language": "en",
+                    "type": "lvl2",
+                    "no_variables": false,
+                    "weight": {
+                        "pageRank": 190,
+                        "level": 80,
+                        "position": 2
+                    },
+                    "hierarchy": {
+                        "lvl0": "react",
+                        "lvl1": "Form Composition",
+                        "lvl2": "Custom Form Hooks",
+                        "lvl3": null,
+                        "lvl4": null,
+                        "lvl5": null,
+                        "lvl6": null
+                    },
+                    "recordVersion": "v3",
+                    "library": "form",
+                    "framework": "react",
+                    "objectID": "2-https://tanstack.com/form/latest/docs/framework/react/guides/form-composition"
+                },
+                {
+                    "version": "latest",
+                    "tags": [],
+                    "url": "https://tanstack.com/form/latest/docs/framework/react/guides/form-composition#breaking-big-forms-into-smaller-pieces",
+                    "url_without_variables": "https://tanstack.com/form/latest/docs/framework/react/guides/form-composition#breaking-big-forms-into-smaller-pieces",
+                    "url_without_anchor": "https://tanstack.com/form/latest/docs/framework/react/guides/form-composition",
+                    "anchor": "breaking-big-forms-into-smaller-pieces",
+                    "content": null,
+                    "content_camel": null,
+                    "lang": "en",
+                    "language": "en",
+                    "type": "lvl2",
+                    "no_variables": false,
+                    "weight": {
+                        "pageRank": 190,
+                        "level": 80,
+                        "position": 10
+                    },
+                    "hierarchy": {
+                        "lvl0": "react",
+                        "lvl1": "Form Composition",
+                        "lvl2": "Breaking big forms into smaller pieces",
+                        "lvl3": null,
+                        "lvl4": null,
+                        "lvl5": null,
+                        "lvl6": null
+                    },
+                    "recordVersion": "v3",
+                    "library": "form",
+                    "framework": "react",
+                    "objectID": "10-https://tanstack.com/form/latest/docs/framework/react/guides/form-composition"
+                }
+            ],
+            "nbHits": 26,
+            "page": 0,
+            "nbPages": 9,
+            "hitsPerPage": 3,
+            "exhaustiveNbHits": true,
+            "exhaustiveTypo": true,
+            "exhaustive": {
+                "nbHits": true,
+                "typo": true
+            },
+            "query": "Form Composition",
+            "params": "query=Form+Composition&hitsPerPage=3&filters=framework%3Areact",
+            "index": "tanstack-test",
+            "renderingContent": {},
+            "processingTimeMS": 2,
+            "processingTimingsMS": {
+                "_request": {
+                    "roundTrip": 23
+                },
+                "fetch": {
+                    "total": 1
+                },
+                "total": 2
+            },
+            "serverTimeMS": 2
+        }
+    ]
+}
