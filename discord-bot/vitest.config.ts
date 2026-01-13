@@ -4,6 +4,9 @@ export default defineConfig({
   root: '.',
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+    include: ['tests/**/*.test.ts', 'tests/**/*.spec.ts'],
+    env: {
+      NODE_ENV: 'development',
+    },
   },
 })

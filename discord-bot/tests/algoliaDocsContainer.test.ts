@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { AlgoliaHit } from '../infrastructure/search/algoliaSearch.js'
-import { createComponents } from './index.js'
+import { createComponents } from '../src/components/index.js'
+import type { AlgoliaHit } from '../src/infrastructure/search/algoliaSearch.js'
 
 const exampleHit: AlgoliaHit = {
   version: 'latest',
@@ -38,7 +38,12 @@ const exampleHit: AlgoliaHit = {
 
 describe('algoliaDocsContainer', () => {
   it('should not error during serialization', () => {
-    const components = createComponents.algoliaResult(exampleHit, 'form') ?? []
+    const components =
+      createComponents.algoliaResult({
+        hit: exampleHit,
+        library: 'form',
+        mention: null,
+      }) ?? []
 
     for (const component of components) {
       expect(() => component.toJSON()).not.toThrow()

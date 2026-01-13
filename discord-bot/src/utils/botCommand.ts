@@ -22,13 +22,18 @@ export interface BotCommand {
   autocomplete?: (interaction: AutocompleteInteraction) => any
 }
 
-export const botCommandSchema = z
+const singleCommandSchema = z
   .strictObject({
     data: z.instanceof(SlashCommandBuilder),
     execute: z.function(),
     autocomplete: z.function().optional(),
   })
   .transform((obj) => obj as BotCommand)
+
+export const botCommandSchema = z.preprocess(
+  (arg) => (Array.isArray(arg) ? arg : [arg]),
+  z.array(singleCommandSchema),
+)
 
 export function createCommand(command: BotCommand): BotCommand {
   return command
@@ -51,7 +56,7 @@ export async function getCommands(): Promise<BotCommand[]> {
     const result = botCommandSchema.safeParse(command)
 
     if (result.success) {
-      commands.push(result.data)
+      commands.push(...result.data)
     } else {
       logger.error(
         `Failed to load command at ${filePath} due to validation errors:\n${z.prettifyError(result.error)}`,

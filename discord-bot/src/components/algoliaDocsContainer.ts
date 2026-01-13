@@ -1,13 +1,21 @@
-import { ContainerBuilder, heading, HeadingLevel, hyperlink } from 'discord.js'
 import {
+  bold,
+  ButtonStyle,
+  ContainerBuilder,
+  heading,
+  HeadingLevel,
+  hyperlink,
+  subtext,
+  TextDisplayBuilder,
+  type User,
+} from 'discord.js'
+import {
+  getTanStackLibraryLabel,
   tryGetFramework,
   type Framework,
+  type TanStackLibrary,
 } from '../infrastructure/frameworks.js'
-import type {
-  AlgoliaHit,
-  TanStackLibrary,
-} from '../infrastructure/search/algoliaSearch.js'
-import { libraryLabels } from './constants.js'
+import type { AlgoliaHit } from '../infrastructure/search/algoliaSearch.js'
 
 function getFooter(
   hit: AlgoliaHit,
@@ -18,7 +26,7 @@ function getFooter(
     return '\u200b'
   }
   const emoji = framework?.emojiMarkdown ? framework.emojiMarkdown + ' ' : ''
-  return `${emoji}${libraryLabels[library]} (${hit.version})`
+  return `${emoji}${getTanStackLibraryLabel(library)} (${hit.version})`
 }
 
 function parseAlgoliaHit(
@@ -26,30 +34,48 @@ function parseAlgoliaHit(
 ): [framework: Framework | null, headers: string] {
   const framework = tryGetFramework(hit.hierarchy.lvl0)
 
-  let { lvl0: first, lvl1: second, lvl2: third } = hit.hierarchy
+  const headers = [
+    hit.hierarchy.lvl0,
+    hit.hierarchy.lvl1,
+    hit.hierarchy.lvl2,
+    hit.hierarchy.lvl3,
+    hit.hierarchy.lvl4,
+    hit.hierarchy.lvl5,
+    hit.hierarchy.lvl6,
+  ].filter((v) => v !== null)
 
-  if (first && first === framework?.value) {
-    first = second
-    second = third
-    third = hit.hierarchy.lvl3
+  if (headers[0] && headers[0] === framework?.value) {
+    headers.shift()
   }
 
-  const firstHeader = first ? heading(hyperlink(first, hit.url)) : null
-  const secondHeader = second ? heading(second, HeadingLevel.Two) : null
-  const thirdHeader = third ? heading(third, HeadingLevel.Three) : null
+  const [first, second, third, ...remaining] = headers
 
-  const items = [firstHeader, secondHeader, thirdHeader].filter(
-    (v) => v !== null,
-  )
+  let output = heading(hyperlink(first ?? 'Docs link', hit.url))
 
-  return [framework, items.join('\n')]
+  if (second) {
+    output += `\n ${heading(second, HeadingLevel.Two)}`
+  }
+  if (third) {
+    output += `\n ${heading(third, HeadingLevel.Three)}`
+  }
+  if (remaining.length > 0) {
+    output += `\n ${remaining.map(bold).join(' > ')}`
+  }
+
+  return [framework, output]
+}
+
+export interface AlgoliaDocsContainerParams {
+  mention: User | null
+  hit: AlgoliaHit
+  library: TanStackLibrary
+  fallbackColor?: number
 }
 
 export function createAlgoliaDocsContainer(
-  hit: AlgoliaHit,
-  library: TanStackLibrary,
-  fallbackColor?: number,
-): [ContainerBuilder] {
+  params: AlgoliaDocsContainerParams,
+): [ContainerBuilder] | [TextDisplayBuilder, ContainerBuilder] {
+  const { hit, library, fallbackColor } = params
   const [framework, header] = parseAlgoliaHit(hit)
 
   const footer = getFooter(hit, framework, library)
@@ -64,9 +90,23 @@ export function createAlgoliaDocsContainer(
     )
   }
 
+  container = container
+    .addSeparatorComponents((s) => s.setDivider(true))
+    .addSectionComponents((section) =>
+      section
+        .addTextDisplayComponents((text) => text.setContent(footer))
+        .setButtonAccessory((button) =>
+          button.setLabel('Docs').setStyle(ButtonStyle.Link).setURL(hit.url),
+        ),
+    )
+
+  if (!params.mention) {
+    return [container]
+  }
   return [
-    container
-      .addSeparatorComponents((s) => s.setDivider(true))
-      .addTextDisplayComponents((text) => text.setContent(footer)),
+    new TextDisplayBuilder().setContent(
+      subtext(`Docs suggestion for ${params.mention}:`),
+    ),
+    container,
   ]
 }

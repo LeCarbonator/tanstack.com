@@ -1,7 +1,12 @@
-import { AutocompleteInteraction, CommandInteraction, Events } from 'discord.js'
-import { createEventHandler } from '../utils/eventHandler.js'
+import {
+  AutocompleteInteraction,
+  CommandInteraction,
+  Events,
+  type Interaction,
+} from 'discord.js'
 import { logger } from '../logging.js'
 import { BotCommand } from '../utils/botCommand.js'
+import { createEventHandler } from '../utils/eventHandler.js'
 
 function missingCommandWarning(
   interaction: CommandInteraction | AutocompleteInteraction,
@@ -20,35 +25,62 @@ function missingAutocompleteWarning(
   )
 }
 
+function notifyUserAboutIssue(interaction: Interaction) {
+  if (!interaction.isRepliable()) return
+
+  if (interaction.replied || interaction.deferred) {
+    void interaction
+      .editReply(
+        '❌ An unexpected error occurred while processing this interaction.',
+      )
+      .catch(() => null)
+  } else {
+    void interaction
+      .reply(
+        '❌ An unexpected error occurred while processing this interaction.',
+      )
+      .catch(() => null)
+  }
+}
+
 export default createEventHandler({
   name: Events.InteractionCreate,
   once: false,
   callback: async (interaction) => {
-    if (interaction.isChatInputCommand()) {
-      const command = interaction.client.commands.get(interaction.commandName)
+    try {
+      if (interaction.isChatInputCommand()) {
+        const command = interaction.client.commands.get(interaction.commandName)
 
-      if (!command) {
-        missingCommandWarning(interaction)
-        return
+        if (!command) {
+          missingCommandWarning(interaction)
+          return void notifyUserAboutIssue(interaction)
+        }
+
+        logger.debug(`Executing command "${command.data.name}" (Slash command)`)
+        void command.execute(interaction)
+      } else if (interaction.isAutocomplete()) {
+        const command = interaction.client.commands.get(interaction.commandName)
+
+        if (!command) {
+          missingCommandWarning(interaction)
+          return void notifyUserAboutIssue(interaction)
+        }
+
+        if (command.autocomplete === undefined) {
+          missingAutocompleteWarning(interaction, command)
+          return void notifyUserAboutIssue(interaction)
+        }
+
+        logger.debug(`Autocompleting "${command.data.name}"`)
+        void command.autocomplete(interaction)
       }
-
-      logger.debug(`Executing command "${command.data.name}" (Slash command)`)
-      void command.execute(interaction)
-    } else if (interaction.isAutocomplete()) {
-      const command = interaction.client.commands.get(interaction.commandName)
-
-      if (!command) {
-        missingCommandWarning(interaction)
-        return
-      }
-
-      if (command.autocomplete === undefined) {
-        missingAutocompleteWarning(interaction, command)
-        return
-      }
-
-      logger.debug(`Autocompleting "${command.data.name}"`)
-      void command.autocomplete(interaction)
+    } catch (error) {
+      logger.error({
+        command: 'commandName' in interaction ? interaction.commandName : null,
+        interactionType: interaction.type,
+        error,
+      })
+      void notifyUserAboutIssue(interaction)
     }
   },
 })

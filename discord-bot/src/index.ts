@@ -1,12 +1,12 @@
 import { Client, Collection, GatewayIntentBits } from 'discord.js'
+import fs from 'node:fs'
+import path from 'node:path'
+import z from 'zod'
 import { env } from './config.js'
 import { logger } from './logging.js'
-import path from 'node:path'
-import fs from 'node:fs'
-import { eventHandlerSchema } from './utils/eventHandler.js'
 import { getCommands } from './utils/botCommand.js'
+import { eventHandlerSchema } from './utils/eventHandler.js'
 import { eventsFolderPath } from './utils/paths.js'
-import z from 'zod'
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
@@ -49,5 +49,5 @@ getCommands().then((commands) => {
   )
 })
 
-logger.debug('Logging in client to Discord...')
+logger.info('Logging in client to Discord...')
 client.login(env.discordToken)

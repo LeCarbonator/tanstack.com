@@ -88,7 +88,7 @@ export function tryGetFramework(
  * Get a list of framework options, formatted to be used in Discord slash command choices.
  * @param frameworks An array of framework values to include. If null, includes all frameworks.
  */
-export function getFrameworkCommandChoices<T extends Array<Framework['value']>>(
+export function getFrameworkCommandChoices<T extends Array<FrameworkValue>>(
   frameworks: T | null,
 ): APIApplicationCommandOptionChoice<string>[] {
   return frameworkOptions
@@ -99,4 +99,35 @@ export function getFrameworkCommandChoices<T extends Array<Framework['value']>>(
       name: f.label,
       value: f.value,
     }))
+}
+
+export type TanStackLibrary =
+  | 'form'
+  | 'start'
+  | 'router'
+  | 'query'
+  | 'table'
+  | 'db'
+  | 'ai'
+  | 'virtual'
+  | 'pacer'
+  | 'store'
+  | 'devtools'
+
+export function getTanStackLibraryLabel(library: TanStackLibrary): string {
+  const libraryLabels: Record<TanStackLibrary, string> = {
+    form: 'Form',
+    ai: 'AI',
+    db: 'DB',
+    devtools: 'Devtools',
+    pacer: 'Pacer',
+    query: 'Query',
+    router: 'Router',
+    start: 'Start',
+    store: 'Store',
+    table: 'Table',
+    virtual: 'Virtual',
+  }
+
+  return libraryLabels[library]
 }

@@ -5,11 +5,13 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "pnpm clean && tsc",
+    "clean": "rimraf dist",
     "start": "node dist/index.js",
     "dev": "pnpm build && pnpm start",
     "deploy:commands": "pnpm build && node dist/deployCommands.js",
-    "test": "vitest --config vitest.config.ts"
+    "typecheck": "tsc --noEmit",
+    "test": "pnpm typecheck && vitest --config vitest.config.ts"
   },
   "keywords": [],
   "author": "Luca Jakob",
@@ -25,6 +27,7 @@
     "zod": "^4.3.5"
   },
   "devDependencies": {
+    "rimraf": "^6.1.2",
     "typescript": "^5.9.3",
     "vitest": "^4.0.17"
   }

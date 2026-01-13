@@ -1,8 +1,7 @@
 import { liteClient, type SearchResponses } from 'algoliasearch/lite'
 import { env } from '../../config.js'
 import { discordLimits } from '../discordApiConstants.js'
-
-export type TanStackLibrary = 'form'
+import type { FrameworkValue, TanStackLibrary } from '../frameworks.js'
 
 const algoliaClient = liteClient(
   env.algoliaConfig.applicationId,
@@ -46,8 +45,8 @@ export type AlgoliaSearchResult = SearchResponses<AlgoliaHit>
 
 interface LiteSearchOptions {
   query: string
-  library?: string
-  framework?: TanStackLibrary
+  framework: FrameworkValue | null
+  library: TanStackLibrary
   /**
    * @default 10
    */
@@ -56,9 +55,7 @@ interface LiteSearchOptions {
 
 function buildFilters(opts: LiteSearchOptions) {
   const filters: string[] = ['version:latest']
-  if (opts.library) {
-    filters.push(`library:${opts.library}`)
-  }
+  filters.push(`library:${opts.library}`)
   if (opts.framework) {
     filters.push(`(framework:${opts.framework} OR framework:all)`)
   }
