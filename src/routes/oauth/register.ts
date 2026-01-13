@@ -4,17 +4,22 @@ import { setResponseHeader } from '@tanstack/react-start/server'
 /**
  * OAuth 2.0 Dynamic Client Registration (RFC 7591)
  *
- * For MCP, we implement a simplified registration that accepts any client
- * and returns a client_id. Since we use PKCE and public clients, we don't
- * need client secrets.
+ * Simplified registration that accepts any client and returns a client_id.
+ * Since we use PKCE and public clients, we don't need client secrets.
  */
 export const Route = createFileRoute('/oauth/register')({
   // @ts-expect-error server property not in route types yet
   server: {
     handlers: {
       POST: async ({ request }: { request: Request }) => {
+        // CORS: Allow any origin for OAuth client registration
+        // This is secure because:
+        // 1. Registration only generates deterministic client IDs
+        // 2. No secrets are issued (PKCE public clients)
+        // 3. Redirect URIs are validated for localhost or HTTPS
+        const origin = request.headers.get('Origin')
         setResponseHeader('Content-Type', 'application/json')
-        setResponseHeader('Access-Control-Allow-Origin', '*')
+        setResponseHeader('Access-Control-Allow-Origin', origin || '*')
         setResponseHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
         setResponseHeader(
           'Access-Control-Allow-Headers',
@@ -25,7 +30,7 @@ export const Route = createFileRoute('/oauth/register')({
           const body = await request.json()
 
           // Extract client metadata from request
-          const clientName = body.client_name || 'MCP Client'
+          const clientName = body.client_name || 'OAuth Client'
           const redirectUris = body.redirect_uris || []
 
           // Validate redirect URIs
@@ -86,11 +91,12 @@ export const Route = createFileRoute('/oauth/register')({
           )
         }
       },
-      OPTIONS: async () => {
+      OPTIONS: async ({ request }: { request: Request }) => {
+        const origin = request.headers.get('Origin')
         return new Response(null, {
           status: 204,
           headers: {
-            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Origin': origin || '*',
             'Access-Control-Allow-Methods': 'POST, OPTIONS',
             'Access-Control-Allow-Headers': 'Content-Type, Authorization',
           },
@@ -115,7 +121,7 @@ function generateClientId(clientName: string): string {
     hash = hash & hash // Convert to 32bit integer
   }
   const hashStr = Math.abs(hash).toString(16).padStart(8, '0')
-  return `mcp-${hashStr}-${clientName
+  return `ts-${hashStr}-${clientName
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '-')
     .slice(0, 20)}`
