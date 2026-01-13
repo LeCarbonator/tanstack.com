@@ -1,15 +1,24 @@
 import { ContainerBuilder, heading, HeadingLevel, hyperlink } from 'discord.js'
-import type { AlgoliaHit } from '../infrastructure/search/algoliaSearch.js'
 import {
   tryGetFramework,
   type Framework,
 } from '../infrastructure/frameworks.js'
+import type {
+  AlgoliaHit,
+  TanStackLibrary,
+} from '../infrastructure/search/algoliaSearch.js'
+import { libraryLabels } from './constants.js'
 
-function getVersionLabel(hit: AlgoliaHit) {
+function getFooter(
+  hit: AlgoliaHit,
+  framework: Framework | null,
+  library: TanStackLibrary,
+) {
   if (typeof hit.version !== 'string') {
     return '\u200b'
   }
-  return `version: ${hit.version}`
+  const emoji = framework?.emojiMarkdown ? framework.emojiMarkdown + ' ' : ''
+  return `${emoji}${libraryLabels[library]} (${hit.version})`
 }
 
 function parseAlgoliaHit(
@@ -25,10 +34,6 @@ function parseAlgoliaHit(
     third = hit.hierarchy.lvl3
   }
 
-  if (framework?.emojiMarkdown) {
-    first = `${framework.emojiMarkdown} ${first}`
-  }
-
   const firstHeader = first ? heading(hyperlink(first, hit.url)) : null
   const secondHeader = second ? heading(second, HeadingLevel.Two) : null
   const thirdHeader = third ? heading(third, HeadingLevel.Three) : null
@@ -40,20 +45,28 @@ function parseAlgoliaHit(
   return [framework, items.join('\n')]
 }
 
-export function createDocsContainer(hit: AlgoliaHit): ContainerBuilder {
+export function createAlgoliaDocsContainer(
+  hit: AlgoliaHit,
+  library: TanStackLibrary,
+  fallbackColor?: number,
+): [ContainerBuilder] {
   const [framework, header] = parseAlgoliaHit(hit)
 
-  const footer = getVersionLabel(hit)
+  const footer = getFooter(hit, framework, library)
 
   let container = new ContainerBuilder()
-    .setAccentColor(framework?.color)
+    .setAccentColor(framework?.color ?? fallbackColor)
     .addTextDisplayComponents((text) => text.setContent(header))
 
   if (hit.content) {
-    container = container
-      .addTextDisplayComponents((text) => text.setContent(hit.content!))
-      .addSeparatorComponents((s) => s.setDivider(true))
+    container = container.addTextDisplayComponents((text) =>
+      text.setContent(hit.content!),
+    )
   }
 
-  return container.addTextDisplayComponents((text) => text.setContent(footer))
+  return [
+    container
+      .addSeparatorComponents((s) => s.setDivider(true))
+      .addTextDisplayComponents((text) => text.setContent(footer)),
+  ]
 }

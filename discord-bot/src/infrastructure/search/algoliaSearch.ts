@@ -1,26 +1,13 @@
 import { liteClient, type SearchResponses } from 'algoliasearch/lite'
 import { env } from '../../config.js'
+import { discordLimits } from '../discordApiConstants.js'
+
+export type TanStackLibrary = 'form'
 
 const algoliaClient = liteClient(
   env.algoliaConfig.applicationId,
   env.algoliaConfig.apiKey,
 )
-
-const ALGOLIA_SEARCH_PARAMS = {
-  attributesToRetrieve: [
-    'hierarchy.lvl1',
-    'hierarchy.lvl2',
-    'hierarchy.lvl3',
-    'hierarchy.lvl4',
-    'hierarchy.lvl5',
-    'hierarchy.lvl6',
-    'url',
-    'content',
-    'library',
-  ],
-  attributesToSnippet: ['content:50'],
-  filters: 'version:latest',
-} as const
 
 export type AlgoliaHierarchyKeys =
   | 'lvl0'
@@ -30,6 +17,16 @@ export type AlgoliaHierarchyKeys =
   | 'lvl4'
   | 'lvl5'
   | 'lvl6'
+
+export const algoliaHierarchyKeys: AlgoliaHierarchyKeys[] = [
+  'lvl0',
+  'lvl1',
+  'lvl2',
+  'lvl3',
+  'lvl4',
+  'lvl5',
+  'lvl6',
+]
 
 // Algolia hit types - our docs-specific shape
 export type AlgoliaHierarchy = {
@@ -41,12 +38,8 @@ export interface AlgoliaHit extends Record<string, unknown> {
   url: string
   library?: string
   hierarchy: AlgoliaHierarchy
-  content?: string
+  content?: string | null
   type?: string
-  __position: number
-  __queryID?: string
-  _highlightResult?: Record<string, unknown>
-  _snippetResult?: Record<string, unknown>
 }
 
 export type AlgoliaSearchResult = SearchResponses<AlgoliaHit>
@@ -54,7 +47,7 @@ export type AlgoliaSearchResult = SearchResponses<AlgoliaHit>
 interface LiteSearchOptions {
   query: string
   library?: string
-  framework?: string
+  framework?: TanStackLibrary
   /**
    * @default 10
    */
@@ -62,29 +55,33 @@ interface LiteSearchOptions {
 }
 
 function buildFilters(opts: LiteSearchOptions) {
-  const filters: string[] = []
+  const filters: string[] = ['version:latest']
   if (opts.library) {
     filters.push(`library:${opts.library}`)
   }
   if (opts.framework) {
-    filters.push(`(framework:${opts.framework} OR framework:)`)
+    filters.push(`(framework:${opts.framework} OR framework:all)`)
   }
+
+  return filters.join(' AND ')
 }
 
 export async function algoliaSearch(
   opts: LiteSearchOptions,
 ): Promise<AlgoliaSearchResult> {
-  const limit = Math.max(opts.limit ?? 10, 25) // 25 is the max allowed by Discord API.
+  const limit = Math.min(
+    opts.limit ?? 10,
+    discordLimits.autoComplete.choiceCount,
+  )
 
   return await algoliaClient.search({
     requests: [
       {
         indexName: 'tanstack-test',
         query: opts.query,
-        hitsPerPage: 3,
-        filters: 'framework:react',
-        // filters: 'framework:angular',
-        // filters: `category:${opts.category}`,
+        hitsPerPage: limit,
+        filters: buildFilters(opts),
+        attributesToSnippet: ['content:50'],
       },
     ],
   })

@@ -1,7 +1,4 @@
-import type {
-  APIApplicationCommandOptionChoice,
-  HexColorString,
-} from 'discord.js'
+import type { APIApplicationCommandOptionChoice } from 'discord.js'
 
 export interface Framework {
   label: string
@@ -65,9 +62,19 @@ export const frameworkOptions = [
     emojiMarkdown: '<:vanilla:1459924183818567916>',
     color: 0xefb100,
   },
+  {
+    label: 'Core',
+    value: 'all',
+    emojiMarkdown: '🏝️',
+    color: 0xe6e6e,
+  },
 ] as const satisfies Framework[]
 
 export type FrameworkValue = (typeof frameworkOptions)[number]['value']
+
+export function isFrameworkValue(value: string): value is FrameworkValue {
+  return tryGetFramework(value) !== null
+}
 
 export function tryGetFramework(
   value: string | null | undefined,

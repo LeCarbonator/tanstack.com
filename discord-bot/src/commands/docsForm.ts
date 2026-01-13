@@ -1,18 +1,18 @@
-import {
-  EmbedBuilder,
-  MessageFlags,
-  SectionBuilder,
-  SlashCommandBuilder,
-} from 'discord.js'
+import { MessageFlags, SlashCommandBuilder } from 'discord.js'
 import { createCommand } from '../utils/botCommand.js'
-import { type AlgoliaSearchResult } from '../infrastructure/search/algoliaSearch.js'
 import {
-  frameworkOptions,
-  getFrameworkCommandChoices,
-} from '../infrastructure/frameworks.js'
-import { getProjectPath } from '../utils/paths.js'
-import { readFileSync } from 'node:fs'
-import { createDocsContainer } from '../utils/container.js'
+  algoliaSearch,
+  type AlgoliaHit,
+} from '../infrastructure/search/algoliaSearch.js'
+import { getFrameworkCommandChoices } from '../infrastructure/frameworks.js'
+import {
+  createAutocompleteChoices,
+  tryGetAutocompleteIndex,
+} from '../utils/formatting.js'
+import { createDocsCacheKey, docsCache } from '../utils/docsCache.js'
+import type { Hit } from 'algoliasearch/lite'
+import { logger } from '../logging.js'
+import { createComponents } from '../components/index.js'
 
 const data = new SlashCommandBuilder()
   .setName('docs-form')
@@ -44,31 +44,60 @@ const data = new SlashCommandBuilder()
 export default createCommand({
   data,
   execute: async (interaction) => {
-    const mockPath = getProjectPath('../mockAlgolia.json')
-    const result = JSON.parse(
-      readFileSync(mockPath, 'utf-8'),
-    ) as AlgoliaSearchResult
+    const cacheHit = docsCache.get(
+      createDocsCacheKey(interaction.user.id, data.name),
+    )
 
-    const firstResult = result.results[0]
-    if ('hits' in firstResult) {
-      await interaction.reply({
-        components: [createDocsContainer(firstResult.hits[0])],
-        flags: MessageFlags.IsComponentsV2,
-      })
+    if (!cacheHit) {
+      await interaction.reply('No cache was found')
+      return
     }
 
-    // const res = await algoliaSearch({
-    //   query: interaction.options.getString('query', true),
+    const selectedIndex = tryGetAutocompleteIndex(
+      interaction.options.getString('query', true),
+    )
 
-    //   // category: 'form',
-    // })
+    if (selectedIndex === null || !('hits' in cacheHit.results[0])) {
+      // TODO
+      await interaction.reply(
+        'TODO: No autocomplete was selected (Call algolia again)',
+      )
+      return
+    }
+
+    logger.debug({
+      hitsLength: cacheHit.results[0].hits.length,
+      selectedIndex,
+      result: cacheHit.results[0].hits[selectedIndex],
+      fallback: cacheHit.results[0].hits[0],
+    })
+    const selectedResult: Hit<AlgoliaHit> | null =
+      cacheHit.results[0].hits[selectedIndex] ?? cacheHit.results[0].hits[0]
+
+    if (!selectedResult) {
+      await interaction.reply('Nothing found')
+      return
+    }
+
+    await interaction.reply({
+      components: createComponents.algoliaResult(
+        selectedResult,
+        'form',
+        0xefb100,
+      ),
+      flags: MessageFlags.IsComponentsV2,
+    })
   },
   autocomplete: async (interaction) => {
-    await interaction.respond([
-      {
-        name: 'API Call to Algolia here',
-        value: interaction.options.getFocused(),
-      },
-    ])
+    const query = interaction.options.getFocused()
+    const cacheKey = createDocsCacheKey(interaction.user.id, data.name)
+    const result = await algoliaSearch({
+      query,
+      library: 'form',
+    })
+
+    docsCache.set(cacheKey, result, 30_000)
+
+    await interaction.respond(createAutocompleteChoices(result))
   },
 })
