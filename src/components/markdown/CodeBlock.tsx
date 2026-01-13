@@ -5,7 +5,7 @@ import { Copy } from 'lucide-react'
 import type { Mermaid } from 'mermaid'
 import { transformerNotationDiff } from '@shikijs/transformers'
 import { createHighlighter, type HighlighterGeneric } from 'shiki'
-import { Button } from './Button'
+import { Button } from '../Button'
 
 // Language aliases mapping
 const LANG_ALIASES: Record<string, string> = {
@@ -15,17 +15,25 @@ const LANG_ALIASES: Record<string, string> = {
   shell: 'bash',
   console: 'bash',
   zsh: 'bash',
+  cmd: 'bash',
   md: 'markdown',
   txt: 'plaintext',
   text: 'plaintext',
+  yml: 'yaml',
+  json5: 'jsonc',
+  eslintrc: 'jsonc',
 }
 
 // Lazy highlighter singleton
 let highlighterPromise: Promise<HighlighterGeneric<any, any>> | null = null
 let mermaidInstance: Mermaid | null = null
 const genSvgMap = new Map<string, string>()
+const failedLanguages = new Set<string>()
 
-async function getHighlighter(language: string) {
+async function getHighlighter(language: string): Promise<{
+  highlighter: HighlighterGeneric<any, any>
+  effectiveLang: string
+}> {
   if (!highlighterPromise) {
     highlighterPromise = createHighlighter({
       themes: ['github-light', 'vitesse-dark'],
@@ -40,6 +48,17 @@ async function getHighlighter(language: string) {
         'css',
         'markdown',
         'plaintext',
+        'toml',
+        'yaml',
+        'sql',
+        'diff',
+        'vue',
+        'svelte',
+        'scss',
+        'jsonc',
+        'vue-html',
+        'angular-html',
+        'angular-ts',
       ],
     })
   }
@@ -48,16 +67,23 @@ async function getHighlighter(language: string) {
   const normalizedLang = LANG_ALIASES[language] || language
   const langToLoad = normalizedLang === 'mermaid' ? 'plaintext' : normalizedLang
 
+  // Return plaintext for known failed languages
+  if (failedLanguages.has(langToLoad)) {
+    return { highlighter, effectiveLang: 'plaintext' }
+  }
+
   // Load language if not already loaded
   if (!highlighter.getLoadedLanguages().includes(langToLoad as any)) {
     try {
       await highlighter.loadLanguage(langToLoad as any)
     } catch {
       console.warn(`Shiki: Language "${langToLoad}" not found, using plaintext`)
+      failedLanguages.add(langToLoad)
+      return { highlighter, effectiveLang: 'plaintext' }
     }
   }
 
-  return highlighter
+  return { highlighter, effectiveLang: langToLoad }
 }
 
 // Lazy load mermaid only when needed
@@ -111,11 +137,7 @@ export function CodeBlock({
   const childElement = props.children as
     | undefined
     | { props?: { className?: string; children?: string } }
-  let lang = childElement?.props?.className?.replace('language-', '')
-
-  if (lang === 'diff') {
-    lang = 'plaintext'
-  }
+  const lang = childElement?.props?.className?.replace('language-', '')
 
   const children = props.children as
     | undefined
@@ -143,15 +165,14 @@ export function CodeBlock({
     ;(async () => {
       const themes = ['github-light', 'vitesse-dark']
       const langStr = lang || 'plaintext'
-      const normalizedLang = LANG_ALIASES[langStr] || langStr
-      const effectiveLang =
-        normalizedLang === 'mermaid' ? 'plaintext' : normalizedLang
 
-      const highlighter = await getHighlighter(langStr)
+      const { highlighter, effectiveLang } = await getHighlighter(langStr)
+      // Trim trailing newlines to prevent empty lines at end of code block
+      const trimmedCode = (code || '').trimEnd()
 
       const htmls = await Promise.all(
         themes.map(async (theme) => {
-          const output = highlighter.codeToHtml(code || '', {
+          const output = highlighter.codeToHtml(trimmedCode, {
             lang: effectiveLang,
             theme,
             transformers: [transformerNotationDiff()],
@@ -159,11 +180,11 @@ export function CodeBlock({
 
           if (lang === 'mermaid') {
             const preAttributes = extractPreAttributes(output)
-            let svgHtml = genSvgMap.get(code || '')
+            let svgHtml = genSvgMap.get(trimmedCode)
             if (!svgHtml) {
               const mermaid = await getMermaid()
-              const { svg } = await mermaid.render('foo', code || '')
-              genSvgMap.set(code || '', svg)
+              const { svg } = await mermaid.render('foo', trimmedCode)
+              genSvgMap.set(trimmedCode, svg)
               svgHtml = svg
             }
             return `<div class='${preAttributes.class} py-4 bg-neutral-50'>${svgHtml}</div>`

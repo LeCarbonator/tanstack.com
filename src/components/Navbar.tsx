@@ -45,7 +45,7 @@ import {
   SIDEBAR_LIBRARY_IDS,
   type LibrarySlim,
 } from '~/libraries'
-import { ADMIN_ACCESS_CAPABILITIES } from '~/db/types'
+import { ADMIN_ACCESS_CAPABILITIES, hasCapability } from '~/db/types'
 import { useCapabilities } from '~/hooks/useCapabilities'
 import { useCurrentUser } from '~/hooks/useCurrentUser'
 import { useClickOutside } from '~/hooks/useClickOutside'
@@ -73,81 +73,24 @@ import {
 } from '~/components/Collapsible'
 import { Card } from '~/components/Card'
 
-export function Navbar({ children }: { children: React.ReactNode }) {
-  const matches = useMatches()
-  const capabilities = useCapabilities()
-  const user = useCurrentUser()
-  const navigate = useNavigate()
-  const { notify } = useToast()
+type LogoProps = {
+  showMenu: boolean
+  setShowMenu: React.Dispatch<React.SetStateAction<boolean>>
+  menuButtonRef: React.RefObject<HTMLButtonElement | null>
+  title?: React.ComponentType<any> | null
+}
 
-  const signOut = async () => {
-    await authClient.signOut()
-    navigate({ to: '/login' })
-    notify(
-      <div>
-        <div className="font-medium">Signed out</div>
-        <div className="text-gray-500 dark:text-gray-400 text-xs">
-          You have been logged out
-        </div>
-      </div>,
-    )
-  }
-
-  const { Title, library } = React.useMemo(() => {
-    const match = [...matches].reverse().find((m) => m.staticData.Title)
-    const libraryId = match?.params?.libraryId
-
-    return {
-      Title: match?.staticData.Title ?? null,
-      library: libraryId ? findLibrary(libraryId) : null,
-    }
-  }, [matches])
-
-  const canAdmin = capabilities.some((cap) =>
-    (ADMIN_ACCESS_CAPABILITIES as readonly string[]).includes(cap),
-  )
-
-  const canApiKeys = capabilities.includes('api-keys')
-
-  const containerRef = React.useRef<HTMLDivElement>(null)
-
-  React.useEffect(() => {
-    const updateContainerHeight = () => {
-      if (containerRef.current) {
-        const height = containerRef.current.offsetHeight
-        document.documentElement.style.setProperty(
-          '--navbar-height',
-          `${height}px`,
-        )
-      }
-    }
-
-    updateContainerHeight() // Initial call to set the height
-
-    window.addEventListener('resize', updateContainerHeight)
-    return () => {
-      window.removeEventListener('resize', updateContainerHeight)
-    }
-  }, [])
-
-  const [showMenu, setShowMenu] = React.useState(false)
+const LogoSection = ({
+  showMenu,
+  setShowMenu,
+  menuButtonRef,
+  title,
+}: LogoProps) => {
   const pointerInsideButtonRef = React.useRef(false)
-
-  const largeMenuRef = React.useRef<HTMLDivElement>(null)
-  const menuButtonRef = React.useRef<HTMLButtonElement>(null)
-
-  // Close mobile menu when clicking outside
-  const smallMenuRef = useClickOutside<HTMLDivElement>({
-    enabled: showMenu,
-    onClickOutside: () => setShowMenu(false),
-    additionalRefs: [largeMenuRef, menuButtonRef],
-  })
-
   const toggleMenu = () => {
     setShowMenu((prev) => !prev)
   }
-
-  const LogoSection = () => (
+  return (
     <>
       <button
         aria-label="Open Menu"
@@ -156,7 +99,7 @@ export function Navbar({ children }: { children: React.ReactNode }) {
           'transition-all duration-300 h-8 px-2 py-1 lg:px-0',
           // At lg: only visible when Title exists (flyout mode)
           // Below lg: always visible
-          Title
+          title
             ? 'lg:w-9 lg:opacity-100 lg:translate-x-0'
             : 'lg:w-0 lg:opacity-0 lg:-translate-x-full',
         )}
@@ -200,6 +143,92 @@ export function Navbar({ children }: { children: React.ReactNode }) {
       </Link>
     </>
   )
+}
+
+const MobileCard = ({
+  children,
+  isActive,
+}: {
+  children: React.ReactNode
+  isActive?: boolean
+}) => (
+  <Card
+    className={twMerge(
+      'md:contents border-gray-200/50 dark:border-gray-700/50 shadow-sm',
+      isActive && 'ring-2 ring-gray-400/30 dark:ring-gray-500/30',
+    )}
+  >
+    {children}
+  </Card>
+)
+
+export function Navbar({ children }: { children: React.ReactNode }) {
+  const matches = useMatches()
+  const capabilities = useCapabilities()
+  const user = useCurrentUser()
+  const navigate = useNavigate()
+  const { notify } = useToast()
+
+  const signOut = async () => {
+    await authClient.signOut()
+    navigate({ to: '/login' })
+    notify(
+      <div>
+        <div className="font-medium">Signed out</div>
+        <div className="text-gray-500 dark:text-gray-400 text-xs">
+          You have been logged out
+        </div>
+      </div>,
+    )
+  }
+
+  const { Title, library } = React.useMemo(() => {
+    const match = [...matches].reverse().find((m) => m.staticData.Title)
+    const libraryId = match?.params?.libraryId
+
+    return {
+      Title: match?.staticData.Title ?? null,
+      library: libraryId ? findLibrary(libraryId) : null,
+    }
+  }, [matches])
+
+  const canAdmin = capabilities.some((cap) =>
+    (ADMIN_ACCESS_CAPABILITIES as readonly string[]).includes(cap),
+  )
+
+  const canApiKeys = !!user // Any logged-in user can access API keys
+
+  const containerRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    const updateContainerHeight = () => {
+      if (containerRef.current) {
+        const height = containerRef.current.offsetHeight
+        document.documentElement.style.setProperty(
+          '--navbar-height',
+          `${height}px`,
+        )
+      }
+    }
+
+    updateContainerHeight() // Initial call to set the height
+
+    window.addEventListener('resize', updateContainerHeight)
+    return () => {
+      window.removeEventListener('resize', updateContainerHeight)
+    }
+  }, [])
+
+  const [showMenu, setShowMenu] = React.useState(false)
+  const largeMenuRef = React.useRef<HTMLDivElement>(null)
+  const menuButtonRef = React.useRef<HTMLButtonElement>(null)
+
+  // Close mobile menu when clicking outside
+  const smallMenuRef = useClickOutside<HTMLDivElement>({
+    enabled: showMenu,
+    onClickOutside: () => setShowMenu(false),
+    additionalRefs: [largeMenuRef, menuButtonRef],
+  })
 
   const loginButton = (
     <>
@@ -278,11 +307,25 @@ export function Navbar({ children }: { children: React.ReactNode }) {
     >
       <div className="flex items-center min-w-0">
         <div className="flex items-center gap-2 font-black text-xl uppercase min-w-0">
-          <React.Suspense fallback={<LogoSection />}>
+          <React.Suspense
+            fallback={
+              <LogoSection
+                menuButtonRef={menuButtonRef}
+                setShowMenu={setShowMenu}
+                showMenu={showMenu}
+                title={Title}
+              />
+            }
+          >
             <LazyBrandContextMenu
               className={twMerge(`flex items-center group flex-shrink-0`)}
             >
-              <LogoSection />
+              <LogoSection
+                menuButtonRef={menuButtonRef}
+                setShowMenu={setShowMenu}
+                showMenu={showMenu}
+                title={Title}
+              />
             </LazyBrandContextMenu>
           </React.Suspense>
           {Title ? (
@@ -318,23 +361,6 @@ export function Navbar({ children }: { children: React.ReactNode }) {
 
   const linkClasses = `flex items-center justify-between gap-2 group px-3 py-3 md:px-2 md:py-1 rounded-lg hover:bg-gray-500/10 font-bold text-base md:text-sm`
 
-  const MobileCard = ({
-    children,
-    isActive,
-  }: {
-    children: React.ReactNode
-    isActive?: boolean
-  }) => (
-    <Card
-      className={twMerge(
-        'md:contents border-gray-200/50 dark:border-gray-700/50 shadow-sm',
-        isActive && 'ring-2 ring-gray-400/30 dark:ring-gray-500/30',
-      )}
-    >
-      {children}
-    </Card>
-  )
-
   const items = (
     <div className="contents md:block">
       <div className="contents md:block">
@@ -363,7 +389,7 @@ export function Navbar({ children }: { children: React.ReactNode }) {
               return indexA - indexB
             })
         })().map((library, i) => {
-          const [prefix, name] = library.name.split(' ')
+          const [_, name] = library.name.split(' ')
           const isActive = library.to === activeLibrary?.to
 
           return (
@@ -432,10 +458,9 @@ export function Navbar({ children }: { children: React.ReactNode }) {
                         <span
                           className={twMerge(
                             `px-2 py-px uppercase font-black rounded-md text-[.65rem]`,
-                            library.badgeTextStyle ?? 'text-white',
-                            'bg-gradient-to-r',
-                            library.colorFrom,
-                            library.colorTo,
+                            'border-2 bg-transparent',
+                            library.textStyle,
+                            library.borderStyle,
                           )}
                         >
                           {library.badge}
@@ -478,13 +503,11 @@ export function Navbar({ children }: { children: React.ReactNode }) {
                               {library.badge ? (
                                 <span
                                   className={twMerge(
-                                    `px-2 py-px uppercase font-black bg-gray-500/10 dark:bg-gray-500/30 rounded-md text-[.7rem]`,
-                                    library.badgeTextStyle ?? 'text-white',
+                                    `px-2 py-px uppercase font-black rounded-md text-[.6rem]`,
+                                    'border bg-transparent',
+                                    'border-current text-current',
                                     'opacity-90 group-hover:opacity-100 transition-opacity',
-                                    'bg-gradient-to-r',
-                                    library.colorFrom,
-                                    library.colorTo,
-                                    'text-[.6rem]',
+                                    library.textColor,
                                   )}
                                 >
                                   {library.badge}
@@ -643,7 +666,7 @@ export function Navbar({ children }: { children: React.ReactNode }) {
             label: (
               <>
                 <span>Feed</span>
-                <span className="px-1.5 py-0.5 text-[.6rem] font-black bg-gradient-to-r from-blue-400 to-blue-600 text-white rounded-md uppercase">
+                <span className="px-1.5 py-0.5 text-[.6rem] font-black border border-blue-500 text-blue-500 rounded-md uppercase">
                   Beta
                 </span>
               </>
@@ -675,7 +698,7 @@ export function Navbar({ children }: { children: React.ReactNode }) {
             label: (
               <>
                 <span>Learn</span>
-                <span className="px-1.5 py-0.5 text-[.6rem] font-black bg-gradient-to-r from-green-400 to-green-600 text-white rounded-md uppercase">
+                <span className="px-1.5 py-0.5 text-[.6rem] font-black border border-green-500 text-green-500 rounded-md uppercase">
                   NEW
                 </span>
               </>

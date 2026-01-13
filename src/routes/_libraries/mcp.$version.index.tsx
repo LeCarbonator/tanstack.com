@@ -12,7 +12,6 @@ import { Button } from '~/components/Button'
 import { MaintainersSection } from '~/components/MaintainersSection'
 import { LibraryPageContainer } from '~/components/LibraryPageContainer'
 import { Key } from 'lucide-react'
-import { useCapabilities } from '~/hooks/useCapabilities'
 
 const library = getLibrary('mcp')
 
@@ -28,8 +27,7 @@ export const Route = createFileRoute('/_libraries/mcp/$version/')({
 })
 
 function McpVersionIndex() {
-  const capabilities = useCapabilities()
-  const canApiKeys = capabilities.includes('api-keys')
+  const canApiKeys = true // Any logged-in user can access API keys
 
   return (
     <LibraryPageContainer>
@@ -45,7 +43,7 @@ function McpVersionIndex() {
               Get Started
             </Button>
             {canApiKeys && (
-              <Button as={Link} to="/account/api-keys">
+              <Button as={Link} to="/account/integrations">
                 <Key className="w-3.5 h-3.5" />
                 Get API Key
               </Button>

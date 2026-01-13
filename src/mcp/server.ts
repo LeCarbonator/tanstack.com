@@ -1,302 +1,216 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { captureEvent } from '~/utils/posthog.server'
+import { withSentrySpan, captureException } from '~/utils/sentry.server'
 import { listLibraries, listLibrariesSchema } from './tools/list-libraries'
-import { getDoc, getDocSchema } from './tools/get-doc'
+import { doc, docSchema } from './tools/doc'
 import { searchDocs, searchDocsSchema } from './tools/search-docs'
-import {
-  searchShowcases,
-  searchShowcasesSchema,
-} from './tools/search-showcases'
-import { getShowcase, getShowcaseSchema } from './tools/get-showcase'
-import { submitShowcase, submitShowcaseSchema } from './tools/submit-showcase'
-import { updateShowcase, updateShowcaseSchema } from './tools/update-showcase'
-import { deleteShowcase, deleteShowcaseSchema } from './tools/delete-showcase'
-import {
-  listMyShowcases,
-  listMyShowcasesSchema,
-} from './tools/list-my-showcases'
+import { npmStats, npmStatsSchema } from './tools/npm-stats'
+import { ecosystem, ecosystemSchema } from './tools/ecosystem'
 
 export type McpAuthContext = {
   userId: string
   keyId: string
 }
 
+type ToolResult = {
+  content: Array<{ type: 'text'; text: string }>
+  isError?: boolean
+}
+
+type ToolHandler<TArgs> = (args: TArgs) => Promise<ToolResult>
+
+function textResult(text: string): ToolResult {
+  return { content: [{ type: 'text', text }] }
+}
+
+function jsonResult(data: unknown): ToolResult {
+  return textResult(JSON.stringify(data))
+}
+
+function errorResult(error: unknown): ToolResult {
+  const message = error instanceof Error ? error.message : 'Unknown error'
+  return {
+    content: [{ type: 'text', text: `Error: ${message}` }],
+    isError: true,
+  }
+}
+
+function withAnalytics<TArgs>(
+  toolName: string,
+  handler: ToolHandler<TArgs>,
+  authContext?: McpAuthContext,
+): ToolHandler<TArgs> {
+  return async (args: TArgs) => {
+    const startTime = performance.now()
+    let success = false
+    let caughtError: Error | null = null
+
+    try {
+      const result = await withSentrySpan(`mcp.${toolName}`, 'mcp.tool', () =>
+        handler(args),
+      )
+      success = !result.isError
+      return result
+    } catch (error) {
+      caughtError = error instanceof Error ? error : new Error(String(error))
+      captureException(caughtError, { toolName, userId: authContext?.userId })
+      throw error
+    } finally {
+      captureEvent(authContext?.userId ?? 'anonymous', 'mcp_tool_called', {
+        tool: toolName,
+        success,
+        response_time_ms: Math.round(performance.now() - startTime),
+        has_error: caughtError !== null,
+        error_type: caughtError?.name,
+        error_message: caughtError?.message,
+        key_id: authContext?.keyId,
+        environment: process.env.NODE_ENV ?? 'development',
+      })
+    }
+  }
+}
+
+export const ALL_TOOL_NAMES = [
+  'list_libraries',
+  'doc',
+  'search_docs',
+  'npm_stats',
+  'ecosystem',
+] as const
+
+export type ToolName = (typeof ALL_TOOL_NAMES)[number]
+
+function getEnabledTools(): Set<ToolName> | undefined {
+  const envVar = process.env.TANSTACK_MCP_ENABLED_TOOLS
+  if (!envVar) return undefined
+
+  const validTools = new Set<ToolName>()
+  const invalidTools: Array<string> = []
+
+  for (const tool of envVar
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean)) {
+    if (ALL_TOOL_NAMES.includes(tool as ToolName)) {
+      validTools.add(tool as ToolName)
+    } else {
+      invalidTools.push(tool)
+    }
+  }
+
+  if (invalidTools.length > 0) {
+    console.warn(
+      `[MCP] Invalid tools: ${invalidTools.join(', ')}. Valid: ${ALL_TOOL_NAMES.join(', ')}`,
+    )
+  }
+
+  return validTools
+}
+
 export function createMcpServer(authContext?: McpAuthContext) {
-  const server = new McpServer({
-    name: 'tanstack',
-    version: '1.0.0',
-  })
+  const server = new McpServer({ name: 'tanstack', version: '1.0.0' })
+  const enabledTools = getEnabledTools()
 
-  // Register list_libraries tool
-  server.tool(
-    'list_libraries',
-    'List all TanStack libraries with metadata. Returns library IDs, names, descriptions, supported frameworks, and documentation URLs.',
-    listLibrariesSchema.shape,
-    async (args) => {
-      const parsed = listLibrariesSchema.parse(args)
-      const result = await listLibraries(parsed)
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify(result, null, 2),
-          },
-        ],
-      }
-    },
-  )
+  const isEnabled = (name: ToolName) => !enabledTools || enabledTools.has(name)
 
-  // Register get_doc tool
-  server.tool(
-    'get_doc',
-    'Fetch a specific TanStack documentation page. Returns the full markdown content.',
-    getDocSchema.shape,
-    async (args) => {
-      try {
-        const parsed = getDocSchema.parse(args)
-        const result = await getDoc(parsed)
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(
+  if (isEnabled('list_libraries')) {
+    server.tool(
+      'list_libraries',
+      'List TanStack libraries with metadata, frameworks, and docs URLs.',
+      listLibrariesSchema.shape,
+      withAnalytics(
+        'list_libraries',
+        async (args) =>
+          jsonResult(await listLibraries(listLibrariesSchema.parse(args))),
+        authContext,
+      ),
+    )
+  }
+
+  if (isEnabled('doc')) {
+    server.tool(
+      'doc',
+      'Fetch a TanStack documentation page by library and path.',
+      docSchema.shape,
+      withAnalytics(
+        'doc',
+        async (args) => {
+          try {
+            const result = await doc(docSchema.parse(args))
+            return {
+              content: [
                 {
-                  title: result.title,
-                  url: result.url,
-                  library: result.library,
-                  version: result.version,
+                  type: 'text',
+                  text: JSON.stringify({
+                    title: result.title,
+                    url: result.url,
+                    library: result.library,
+                    version: result.version,
+                  }),
                 },
-                null,
-                2,
-              ),
-            },
-            {
-              type: 'text' as const,
-              text: `\n---\n\n${result.content}`,
-            },
-          ],
-        }
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            },
-          ],
-          isError: true,
-        }
-      }
-    },
-  )
+                { type: 'text', text: `\n---\n\n${result.content}` },
+              ],
+            }
+          } catch (error) {
+            return errorResult(error)
+          }
+        },
+        authContext,
+      ),
+    )
+  }
 
-  // Register search_docs tool
-  server.tool(
-    'search_docs',
-    'Search TanStack documentation. Returns matching pages with titles, URLs, and content snippets.',
-    searchDocsSchema.shape,
-    async (args) => {
-      const parsed = searchDocsSchema.parse(args)
-      const result = await searchDocs(parsed)
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify(result, null, 2),
-          },
-        ],
-      }
-    },
-  )
+  if (isEnabled('search_docs')) {
+    server.tool(
+      'search_docs',
+      'Search TanStack documentation. Returns matching pages with snippets.',
+      searchDocsSchema.shape,
+      withAnalytics(
+        'search_docs',
+        async (args) =>
+          jsonResult(await searchDocs(searchDocsSchema.parse(args))),
+        authContext,
+      ),
+    )
+  }
 
-  // ============================================================================
-  // Showcase Tools
-  // ============================================================================
+  if (isEnabled('npm_stats')) {
+    server.tool(
+      'npm_stats',
+      'NPM download statistics. Org summary (default), library breakdown, or package comparison.',
+      npmStatsSchema.shape,
+      withAnalytics(
+        'npm_stats',
+        async (args) => {
+          try {
+            return jsonResult(await npmStats(npmStatsSchema.parse(args)))
+          } catch (error) {
+            return errorResult(error)
+          }
+        },
+        authContext,
+      ),
+    )
+  }
 
-  // Register search_showcases tool (public, no auth required)
-  server.tool(
-    'search_showcases',
-    'Search approved TanStack showcase projects. Filter by libraries, use cases, or text search. Returns project details with links.',
-    searchShowcasesSchema.shape,
-    async (args) => {
-      try {
-        const parsed = searchShowcasesSchema.parse(args)
-        const result = await searchShowcases(parsed)
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
-        }
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            },
-          ],
-          isError: true,
-        }
-      }
-    },
-  )
-
-  // Register get_showcase tool (public, no auth required for approved showcases)
-  server.tool(
-    'get_showcase',
-    'Get details of a specific showcase project by ID. Returns full project information.',
-    getShowcaseSchema.shape,
-    async (args) => {
-      try {
-        const parsed = getShowcaseSchema.parse(args)
-        const result = await getShowcase(parsed, authContext)
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
-        }
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            },
-          ],
-          isError: true,
-        }
-      }
-    },
-  )
-
-  // Register submit_showcase tool (requires auth)
-  server.tool(
-    'submit_showcase',
-    'Submit a new project to the TanStack showcase. Requires authentication. Submissions are reviewed by moderators before appearing publicly.',
-    submitShowcaseSchema.shape,
-    async (args) => {
-      try {
-        const parsed = submitShowcaseSchema.parse(args)
-        const result = await submitShowcase(parsed, authContext)
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
-        }
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            },
-          ],
-          isError: true,
-        }
-      }
-    },
-  )
-
-  // Register update_showcase tool (requires auth + ownership)
-  server.tool(
-    'update_showcase',
-    'Update an existing showcase submission. Requires authentication and ownership. Updates reset the showcase to pending review.',
-    updateShowcaseSchema.shape,
-    async (args) => {
-      try {
-        const parsed = updateShowcaseSchema.parse(args)
-        const result = await updateShowcase(parsed, authContext)
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
-        }
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            },
-          ],
-          isError: true,
-        }
-      }
-    },
-  )
-
-  // Register delete_showcase tool (requires auth + ownership)
-  server.tool(
-    'delete_showcase',
-    'Delete a showcase submission. Requires authentication and ownership.',
-    deleteShowcaseSchema.shape,
-    async (args) => {
-      try {
-        const parsed = deleteShowcaseSchema.parse(args)
-        const result = await deleteShowcase(parsed, authContext)
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
-        }
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            },
-          ],
-          isError: true,
-        }
-      }
-    },
-  )
-
-  // Register list_my_showcases tool (requires auth)
-  server.tool(
-    'list_my_showcases',
-    'List your own showcase submissions. Requires authentication. Shows all your submissions including pending and denied ones.',
-    listMyShowcasesSchema.shape,
-    async (args) => {
-      try {
-        const parsed = listMyShowcasesSchema.parse(args)
-        const result = await listMyShowcases(parsed, authContext)
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
-        }
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            },
-          ],
-          isError: true,
-        }
-      }
-    },
-  )
+  if (isEnabled('ecosystem')) {
+    server.tool(
+      'ecosystem',
+      'Ecosystem partner recommendations. Filter by category (database, auth, deployment, monitoring, cms, api, data-grid) or library.',
+      ecosystemSchema.shape,
+      withAnalytics(
+        'ecosystem',
+        async (args) => {
+          try {
+            return jsonResult(await ecosystem(ecosystemSchema.parse(args)))
+          } catch (error) {
+            return errorResult(error)
+          }
+        },
+        authContext,
+      ),
+    )
+  }
 
   return server
 }

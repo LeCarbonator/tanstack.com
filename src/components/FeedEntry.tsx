@@ -1,5 +1,5 @@
 import { format, formatDistanceToNow } from '~/utils/dates'
-import { Markdown } from '~/components/Markdown'
+import { Markdown } from '~/components/markdown'
 import { libraries } from '~/libraries'
 import { partners } from '~/utils/partners'
 import { twMerge } from 'tailwind-merge'
@@ -40,6 +40,7 @@ interface FeedEntryProps {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-redeclare
 export function FeedEntry({
   entry,
   showFullContent = false,

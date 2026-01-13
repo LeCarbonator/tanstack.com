@@ -7,6 +7,7 @@ export type MarkdownHeading = {
   id: string
   text: string
   level: number
+  framework?: string
 }
 
 type HastElement = {
@@ -27,18 +28,23 @@ type VFileData = {
 
 const isTabsAncestor = (ancestor: HastElement) => {
   if (ancestor.type !== 'element') {
-    console.log('skip')
     return false
   }
 
   if (ancestor.tagName !== 'md-comment-component') {
-    console.log('skip')
     return false
   }
 
   const component = ancestor.properties?.['data-component']
-  console.log('dont skip', component)
   return typeof component === 'string' && component.toLowerCase() === 'tabs'
+}
+
+const isFrameworkPanelAncestor = (ancestor: HastElement) => {
+  if (ancestor.type !== 'element') {
+    return false
+  }
+
+  return ancestor.tagName === 'md-framework-panel'
 }
 
 export function rehypeCollectHeadings(initialHeadings?: MarkdownHeading[]) {
@@ -65,10 +71,29 @@ export function rehypeCollectHeadings(initialHeadings?: MarkdownHeading[]) {
         return
       }
 
+      let currentFramework: string | undefined
+
+      const headingDataFramework = node.properties?.['data-framework']
+      if (typeof headingDataFramework === 'string') {
+        currentFramework = headingDataFramework
+      } else if (Array.isArray(ancestors)) {
+        const frameworkPanel = ancestors.find((ancestor) =>
+          isFrameworkPanelAncestor(ancestor as HastElement),
+        ) as HastElement | undefined
+
+        if (frameworkPanel) {
+          const dataFramework = frameworkPanel.properties?.['data-framework']
+          if (typeof dataFramework === 'string') {
+            currentFramework = dataFramework
+          }
+        }
+      }
+
       headings.push({
         id,
         level: Number(node.tagName.substring(1)),
         text: toString(node as any).trim(),
+        framework: currentFramework,
       })
     })
 

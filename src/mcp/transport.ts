@@ -1,10 +1,12 @@
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { createMcpServer, type McpAuthContext } from './server'
 import {
-  validateApiKey,
+  validateMcpAuth,
   checkRateLimit,
   cleanupRateLimits,
 } from './auth.server'
+import { flushPostHog } from '~/utils/posthog.server'
+import { initSentryServer } from '~/utils/sentry.server'
 
 /**
  * Create a JSON-RPC error response
@@ -32,6 +34,9 @@ function jsonRpcError(
 }
 
 export async function handleMcpRequest(request: Request): Promise<Response> {
+  // Initialize Sentry once per request
+  initSentryServer()
+
   // Validate auth
   const authHeader = request.headers.get('Authorization')
 
@@ -43,7 +48,7 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
     )
   }
 
-  const authResult = await validateApiKey(authHeader)
+  const authResult = await validateMcpAuth(authHeader)
 
   if (!authResult.success) {
     return jsonRpcError(-32001, authResult.error, authResult.status)
@@ -109,5 +114,8 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
       error instanceof Error ? error.message : 'Internal error',
       500,
     )
+  } finally {
+    // Flush PostHog events before serverless function terminates
+    await flushPostHog()
   }
 }

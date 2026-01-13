@@ -1,6 +1,5 @@
 import { createFileRoute, Outlet, Link, redirect } from '@tanstack/react-router'
 import { requireAuth } from '~/utils/auth.server'
-import { useCapabilities } from '~/hooks/useCapabilities'
 
 export const Route = createFileRoute('/_libraries/account')({
   component: AccountLayout,
@@ -16,8 +15,7 @@ export const Route = createFileRoute('/_libraries/account')({
 })
 
 function AccountLayout() {
-  const capabilities = useCapabilities()
-  const canApiKeys = capabilities.includes('api-keys')
+  const canApiKeys = true // Any logged-in user can access API keys
 
   return (
     <div className="min-h-screen mx-auto p-4 md:p-8 w-full">
@@ -82,7 +80,7 @@ function AccountLayout() {
             </Link>
             {canApiKeys && (
               <Link
-                to="/account/api-keys"
+                to="/account/integrations"
                 className="pb-4 px-1 border-b-2 font-medium text-sm transition-colors"
                 activeProps={{
                   className: 'border-blue-600 text-blue-600 dark:text-blue-400',
@@ -92,7 +90,7 @@ function AccountLayout() {
                     'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300',
                 }}
               >
-                API Keys
+                Integrations
               </Link>
             )}
           </nav>

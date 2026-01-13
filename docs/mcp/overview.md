@@ -15,18 +15,13 @@ AI assistants are trained on snapshots of documentation that become stale over t
 
 ## Quick Start
 
-Copy and paste the following instructions to your AI agent:
-
-> [!NOTE]
-> Replace `YOUR_API_KEY` with an API key from [tanstack.com/account/api-keys](/account/api-keys)
+Most MCP clients support OAuth authentication. Just add the server URL:
 
 ```
-Connect to the TanStack MCP server with these settings:
-
-URL: https://tanstack.com/api/mcp
-Transport: Streamable HTTP
-Authorization Header: Bearer YOUR_API_KEY
+https://tanstack.com/api/mcp
 ```
+
+Your client will open a browser window to authorize access on first use. No API key needed.
 
 See [Connecting](./connecting) for client-specific setup instructions.
 
@@ -52,6 +47,15 @@ The MCP server exposes tools for documentation and showcase management:
 | `update_showcase`   | Update your existing showcase submission   | Yes           |
 | `delete_showcase`   | Delete your showcase submission            | Yes           |
 | `list_my_showcases` | List your own showcase submissions         | Yes           |
+
+### NPM Stats Tools
+
+| Tool                        | Description                                             | Auth Required |
+| --------------------------- | ------------------------------------------------------- | ------------- |
+| `get_npm_stats`             | Get aggregated download stats for TanStack or a library | No            |
+| `list_npm_comparisons`      | List preset package comparisons (Data Fetching, etc.)   | No            |
+| `compare_npm_packages`      | Compare download stats for multiple packages over time  | No            |
+| `get_npm_package_downloads` | Get detailed historical downloads for a single package  | No            |
 
 See [Available Tools](./tools) for detailed parameter documentation.
 
